@@ -1,0 +1,5 @@
+target/
+.DS_Store
+.env
+application-local.properties
+src/main/resources/application-local.properties
