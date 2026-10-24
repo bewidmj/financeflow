@@ -1,139 +1,82 @@
-# FinanceFlow 💰
+# FinanceFlow
 
-**FinanceFlow** is a personal finance and cashflow management platform built with Java, Spring Boot, and PostgreSQL.
+A personal finance management REST API built with Java and Spring Boot. FinanceFlow provides APIs for managing financial transactions, importing transaction data from CSV files, and tracking budgets against spending.
 
-The project is being developed as a hands-on backend engineering initiative to explore REST API design, database persistence, testing, scalable application architecture, event-driven processing, and microservices.
+The project is being developed as a hands-on learning journey covering REST API design, Spring Data JPA, PostgreSQL, validation, testing, database performance, authentication, and service-oriented architecture.
 
-## 🎯 Project Goals
+## Features
 
-- Build clean, maintainable REST APIs using Spring Boot.
-- Implement persistence with Spring Data JPA, Hibernate, and PostgreSQL.
-- Apply DTOs, input validation, and consistent exception handling.
-- Support financial transaction tracking, budgeting, and cashflow analytics.
-- Explore asynchronous processing with Apache Kafka.
-- Evolve from a modular monolith toward independently deployable services where justified.
-- Practice production-oriented testing, observability, and deployment.
+### Financial Transactions
+- Create and retrieve financial transactions.
+- Represent income and expenses using structured DTOs.
+- Persist transaction data using Spring Data JPA and PostgreSQL.
+- Filter transactions using supported search criteria.
+- Handle API errors centrally using `@RestControllerAdvice`.
 
-## 🛠️ Technology Stack
+### CSV Import
+- Import financial transactions from CSV files.
+- Report successful imports and failed records.
+- Process large CSV files and investigate persistence performance.
+- Explore Hibernate JDBC batching and database ID-generation strategies.
+
+### Budget Management
+- Create, retrieve, update, and delete budgets.
+- Aggregate transaction spending against budgets.
+- Calculate remaining budget and percentage utilized.
+
+### API Documentation
+- Interactive API documentation using Swagger UI and OpenAPI.
+- Test endpoints without needing a separate API client.
+
+### Testing
+- Controller and service tests.
+- Integration testing with Spring Boot and PostgreSQL configuration.
+
+## Tech Stack
 
 | Technology | Purpose |
 |---|---|
-| Java 21 | Backend development |
+| Java 21 | Programming language |
 | Spring Boot | Application framework |
-| Spring Web | REST API development |
-| Spring Data JPA | Data access and persistence |
-| Hibernate | ORM |
-| PostgreSQL 16 | Relational database |
+| Spring Web | REST APIs |
+| Spring Data JPA | Persistence and repository layer |
+| Hibernate | ORM and SQL generation |
+| PostgreSQL | Relational database |
+| Swagger / OpenAPI | API documentation |
 | Maven | Build and dependency management |
-| Springdoc OpenAPI / Swagger UI | API documentation |
-| Git and GitHub | Version control |
+| JUnit / Spring Boot Test | Automated testing |
+| Docker | Containerization |
 
-## 🏗️ Current Architecture
+## Architecture
 
-The application follows a layered architecture.
+The application follows a layered architecture:
 
 ```text
-Client / Swagger UI
-        |
-        v
-    Controller
-        |
-        v
-      Service
-        |
-        v
-    Repository
-        |
-        v
-    PostgreSQL
+Client
+  |
+  v
+REST Controllers
+  |
+  v
+Services
+  |
+  v
+Repositories (Spring Data JPA)
+  |
+  v
+PostgreSQL
 ```
 
-### Layer Responsibilities
+DTOs separate API request/response models from persistence entities. Centralized exception handling provides a consistent approach to API errors.
 
-- **Controller:** Exposes REST endpoints and handles HTTP requests and responses.
-- **Service:** Contains business logic and transaction boundaries.
-- **Repository:** Uses Spring Data JPA for database operations.
-- **Entity:** Represents the persisted financial transaction.
-- **DTOs:** Separate the API request and response contracts from the persistence model.
-
-## ✅ Implemented Features
-
-- Create a financial transaction.
-- Retrieve all financial transactions.
-- Retrieve a transaction by its ID.
-- Persist transactions in PostgreSQL.
-- Generate transaction IDs through database identity generation.
-- Use request and response DTOs.
-- Represent transactions using `INCOME` and `EXPENSE` types.
-- Document REST endpoints through Swagger UI.
-
-## 🔌 API Endpoints
-
-Base URL: `http://localhost:8080`
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/v1/transactions` | Create a transaction |
-| GET | `/api/v1/transactions` | Retrieve all transactions |
-| GET | `/api/v1/transactions/{id}` | Retrieve a transaction by ID |
-
-### Create a Transaction
-
-**Request**
-
-`POST /api/v1/transactions`
-
-```json
-{
-  "amount": 1250.50,
-  "type": "EXPENSE",
-  "category": "GROCERIES",
-  "description": "Weekly groceries",
-  "transactionDate": "2026-10-12"
-}
-```
-
-**Example response**
-
-```json
-{
-  "id": 1,
-  "amount": 1250.50,
-  "type": "EXPENSE",
-  "category": "GROCERIES",
-  "description": "Weekly groceries",
-  "transactionDate": "2026-10-12"
-}
-```
-
-The database-generated `id` is included in the response.
-
-### Transaction Types
-
-- `INCOME` — Money received.
-- `EXPENSE` — Money spent.
-
-### API Documentation
-
-Once the application is running, access Swagger UI at:
-
-`http://localhost:8080/swagger-ui/index.html`
-
-OpenAPI specification:
-
-`http://localhost:8080/v3/api-docs`
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Install the following:
+## Prerequisites
 
 - Java 21
-- PostgreSQL 16
+- PostgreSQL
 - Git
+- Maven, or the Maven Wrapper included in the repository
 
-Maven is included through the Maven Wrapper, so a separate Maven installation is not required to run the project.
+## Getting Started
 
 ### 1. Clone the repository
 
@@ -142,7 +85,7 @@ git clone https://github.com/bewidmj/financeflow.git
 cd financeflow
 ```
 
-### 2. Create the database
+### 2. Create the PostgreSQL database
 
 Open PostgreSQL and create the database:
 
@@ -150,100 +93,140 @@ Open PostgreSQL and create the database:
 CREATE DATABASE financeflow_db;
 ```
 
-Ensure your PostgreSQL user has permission to connect to and use the database.
+Ensure your PostgreSQL user has permission to connect to this database.
 
-### 3. Configure local properties
+### 3. Configure the database connection
 
-Create `src/main/resources/application-local.properties` and configure your local PostgreSQL connection:
+Review `src/main/resources/application.yml` or `application.properties`, depending on the configuration file in your checkout.
 
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/financeflow_db
-spring.datasource.username=your_postgres_username
-spring.datasource.password=your_postgres_password
+Configure the JDBC URL, username, and password for your local PostgreSQL instance. Do not commit actual passwords or other secrets.
+
+Example configuration:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/financeflow_db
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 ```
 
-Use your own local PostgreSQL credentials.
-
-Ensure the application uses the `local` profile by default or activate it explicitly. Keep local credentials out of version control.
+Use the configuration properties already defined by the project; adapt the example if your existing configuration uses different names.
 
 ### 4. Run the application
 
-On macOS or Linux:
+If the repository includes the Maven Wrapper:
 
 ```bash
-chmod +x mvnw
 ./mvnw spring-boot:run
 ```
 
-On Windows:
+Alternatively, if Maven is installed:
 
-```bat
-mvnw.cmd spring-boot:run
+```bash
+mvn spring-boot:run
 ```
 
-The application should start on port `8080`, unless configured otherwise.
+The default application URL is:
 
-### 5. Test the API
+```text
+http://localhost:8080
+```
 
-Open Swagger UI:
+### 5. Open Swagger UI
 
-`http://localhost:8080/swagger-ui/index.html`
+When the application is running, open:
 
-Use the interactive interface to create and retrieve transactions.
+```text
+http://localhost:8080/swagger-ui/index.html
+```
 
-## 🧪 Testing
+Use Swagger UI to explore the available endpoints and test requests.
 
-Run the automated test suite with:
+## API Overview
+
+The following endpoint groups are implemented in the current project.
+
+### Transactions
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/v1/transactions` | Create a transaction |
+| GET | `/api/v1/transactions` | Retrieve transactions |
+| POST | `/api/v1/transactions/import` | Import transactions from CSV |
+
+Transaction filtering is supported through the implemented query parameters. Refer to Swagger UI for the current request schemas and exact parameter names.
+
+### Budgets
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/v1/budgets` | Create a budget |
+| GET | `/api/v1/budgets` | Retrieve budgets |
+| GET | `/api/v1/budgets/{id}` | Retrieve a budget by ID |
+| PUT | `/api/v1/budgets/{id}` | Update a budget |
+| DELETE | `/api/v1/budgets/{id}` | Delete a budget |
+
+Budget responses include spending information aggregated from the transaction data.
+
+## Running Tests
+
+Run the test suite using the Maven Wrapper:
 
 ```bash
 ./mvnw test
 ```
 
-Build the project with:
+Or, with Maven installed:
 
 ```bash
-./mvnw clean verify
+mvn test
 ```
 
-## 🗺️ Development Roadmap
+## Related Project: Identity Service
 
-The following features are planned for future iterations.
+The separate [FinanceFlow Identity Service](https://github.com/bewidmj/financeflow-identity-service) is being developed to provide:
 
-- [ ] Global exception handling and standardized error responses
-- [ ] Bean Validation for incoming requests
-- [ ] Correct HTTP status codes and resource creation responses
-- [ ] Automated unit and integration tests
-- [ ] Pagination, sorting, and transaction filtering
-- [ ] Category management
-- [ ] Budget creation and tracking
-- [ ] Monthly income and expense reports
-- [ ] CSV import with duplicate detection and idempotency
-- [ ] Database schema migrations using Flyway
-- [ ] Authentication and authorization
-- [ ] Docker-based local development and deployment
-- [ ] Kafka-based asynchronous transaction processing
-- [ ] Reliable event publishing and consumer retry handling
-- [ ] Monitoring, logging, and observability
-- [ ] Extract selected components into microservices when justified
+- User registration and login.
+- Password hashing with BCrypt.
+- JWT access tokens.
+- Protected user-profile endpoints.
+- Stateless request authentication.
 
-## 🧠 Engineering Principles
+Registration, login, and JWT-protected profile access have been tested independently. Integration between the Identity Service and the main FinanceFlow transaction APIs remains part of the development roadmap.
 
-FinanceFlow is being developed with an emphasis on:
+## Roadmap
 
-- Separation of concerns and clean architecture.
-- Immutable DTOs and explicit API contracts.
-- Database consistency and transaction management.
-- Input validation and predictable error handling.
-- Automated testing and incremental delivery.
-- Idempotency and reliability in distributed processing.
-- Choosing architectural complexity based on actual requirements.
+- [x] Transaction REST API and persistence
+- [x] DTO-based request and response handling
+- [x] Centralized exception handling
+- [x] CSV transaction import
+- [x] Transaction filtering
+- [x] Budget management and spending aggregation
+- [x] Initial automated tests
+- [x] Separate Identity Service with JWT authentication
+- [ ] Swagger Bearer-token authorization for the Identity Service
+- [ ] Integrate authentication with FinanceFlow transaction APIs
+- [ ] Associate transactions with authenticated users
+- [ ] Expand validation and automated security tests
+- [ ] Database migrations and schema versioning
+- [ ] Benchmark and optimize bulk CSV imports using Hibernate JDBC batching
+- [ ] Improve deployment and container orchestration
+- [ ] Explore event-driven processing with Kafka
 
-## 📌 Project Status
+## Learning Goals
 
-**Status:** Active development
+FinanceFlow is also a practical learning project for understanding:
 
-The current implementation provides the foundation for financial transaction CRUD operations. Additional business features, production-quality error handling, automated tests, and distributed processing will be introduced incrementally.
+- REST API design and layered application architecture
+- DTOs, Java records, and bean validation
+- JPA entity mapping and Hibernate behavior
+- Transaction boundaries and `@Transactional`
+- PostgreSQL indexing and query performance
+- JDBC batching and bulk-import optimization
+- Spring Security, JWT, and authentication
+- Automated testing, Docker, and deployment
 
----
+## License
 
-Built as a hands-on Java backend engineering project.
+No license has been specified yet.
