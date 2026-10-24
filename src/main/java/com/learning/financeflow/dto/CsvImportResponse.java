@@ -6,6 +6,7 @@ import java.util.List;
 public record CsvImportResponse(
         int imported,
         int failed,
-        List<String> errors
+        List<String> errors,
+        long processingTimeMs
 ) {
 }

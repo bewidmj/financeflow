@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: financeflow
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: financeflow
+  template:
+    metadata:
+      labels:
+        app: financeflow
+    spec:
+      containers:
+        - name: financeflow
+          image: financeflow:1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: financeflow-config
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"

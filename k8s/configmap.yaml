@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: financeflow-config
+data:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://host.docker.internal:5432/financeflow_db"
+  SPRING_DATASOURCE_USERNAME: "mayank"
+  SERVER_PORT: "8080"

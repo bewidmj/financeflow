@@ -37,6 +37,13 @@ public class CsvTransactionImportService {
             "transactionDate"
     );
 
+    private static final int BATCH_SIZE = 50;
+
+    private record ImportRow(
+            long rowNumber,
+            CreateTransactionRequest request) {
+    }
+
     private final FinancialTransactionService transactionService;
     private final Validator validator;
 
@@ -47,7 +54,10 @@ public class CsvTransactionImportService {
         this.validator = validator;
     }
 
+    
     public CsvImportResponse importCsv(MultipartFile file) {
+
+        long startTime = System.nanoTime();
 
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(
@@ -59,6 +69,7 @@ public class CsvTransactionImportService {
         int imported = 0;
         int failed = 0;
         List<String> errors = new ArrayList<>();
+        List<ImportRow> validRows = new ArrayList<>();
 
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader()
@@ -67,7 +78,7 @@ public class CsvTransactionImportService {
 
         try (Reader reader = new InputStreamReader(
                     file.getInputStream(), StandardCharsets.UTF_8);
-             CSVParser parser = CSVParser.parse(reader, format)) {
+            CSVParser parser = CSVParser.parse(reader, format)) {
 
             if (!parser.getHeaderMap().keySet()
                     .containsAll(REQUIRED_HEADERS)) {
@@ -78,6 +89,7 @@ public class CsvTransactionImportService {
                 );
             }
 
+            // Phase 1: Parse and validate every row.
             for (CSVRecord record : parser) {
                 long rowNumber = record.getRecordNumber() + 1;
                 CreateTransactionRequest request;
@@ -107,14 +119,7 @@ public class CsvTransactionImportService {
                     continue;
                 }
 
-                try {
-                    transactionService.create(request);
-                    imported++;
-                } catch (DataAccessException ex) {
-                    failed++;
-                    errors.add("Row " + rowNumber
-                            + ": Database error while saving transaction");
-                }
+                validRows.add(new ImportRow(rowNumber, request));
             }
 
         } catch (IOException ex) {
@@ -125,8 +130,38 @@ public class CsvTransactionImportService {
             );
         }
 
-        return new CsvImportResponse(imported, failed, errors);
+        // Phase 2: Save valid rows in independent transactions of 50.
+        for (int start = 0; start < validRows.size();
+                start += BATCH_SIZE) {
+
+            int end = Math.min(start + BATCH_SIZE, validRows.size());
+            List<ImportRow> batch = validRows.subList(start, end);
+
+            List<CreateTransactionRequest> requests = batch.stream()
+                    .map(ImportRow::request)
+                    .toList();
+
+            try {
+                transactionService.createBulk(requests);
+                imported += batch.size();
+
+            } catch (DataAccessException ex) {
+                failed += batch.size();
+
+                for (ImportRow row : batch) {
+                    errors.add("Row " + row.rowNumber()
+                            + ": Database error while saving transaction");
+                }
+            }
+        }
+
+        long processingTimeMs =
+                (System.nanoTime() - startTime) / 1_000_000;
+
+        return new CsvImportResponse(
+                imported, failed, errors, processingTimeMs);
     }
+
 
     private CreateTransactionRequest toRequest(CSVRecord record) {
 

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: financeflow
+spec:
+  type: ClusterIP
+  selector:
+    app: financeflow
+  ports:
+    - port: 8080
+      targetPort: 8080

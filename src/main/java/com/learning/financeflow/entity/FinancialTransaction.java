@@ -9,7 +9,15 @@ import java.time.LocalDate;
 public class FinancialTransaction {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(
+        strategy = GenerationType.SEQUENCE,
+        generator = "transaction_seq_generator"
+    )
+    @SequenceGenerator(
+        name = "transaction_seq_generator",
+        sequenceName = "financial_transaction_seq",
+        allocationSize = 50
+    )
     private Long id;
 
     @Column(nullable = false, precision = 19, scale = 2)
