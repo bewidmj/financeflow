@@ -5,9 +5,13 @@ import com.learning.financeflow.dto.CreateTransactionRequest;
 import com.learning.financeflow.dto.TransactionResponse;
 import com.learning.financeflow.entity.TransactionType;
 import com.learning.financeflow.exception.GlobalExceptionHandler;
+import com.learning.financeflow.service.CsvTransactionImportService;
 import com.learning.financeflow.service.FinancialTransactionService;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -33,6 +37,9 @@ class FinancialTransactionControllerTest {
 
     @MockitoBean
     private FinancialTransactionService service;
+
+    @MockitoBean
+    private CsvTransactionImportService csvTransactionImportService;
 
     private TransactionResponse sampleResponse() {
         return new TransactionResponse(
@@ -71,16 +78,39 @@ class FinancialTransactionControllerTest {
     }
 
     @Test
-    void findAllShouldReturn200AndTransactions() throws Exception {
-        when(service.findAll()).thenReturn(List.of(sampleResponse()));
+    void searchShouldReturn200AndPagedTransactions() throws Exception {
+        var pageable = PageRequest.of(
+                0, 10, Sort.by(Sort.Direction.DESC, "transactionDate"));
+        when(service.search(
+                TransactionType.EXPENSE,
+                "GROCERIES",
+                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 31),
+                pageable
+        )).thenReturn(new PageImpl<>(
+                List.of(sampleResponse()), pageable, 1));
 
-        mockMvc.perform(get("/api/v1/transactions"))
+        mockMvc.perform(get("/api/v1/transactions")
+                        .param("type", "EXPENSE")
+                        .param("category", "GROCERIES")
+                        .param("from", "2026-10-01")
+                        .param("to", "2026-10-31")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("sort", "transactionDate,desc"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].category").value("GROCERIES"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].category").value("GROCERIES"));
 
-        verify(service).findAll();
+        verify(service).search(
+                TransactionType.EXPENSE,
+                "GROCERIES",
+                LocalDate.of(2026, 10, 1),
+                LocalDate.of(2026, 10, 31),
+                pageable
+        );
     }
 
     @Test
