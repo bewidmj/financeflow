@@ -113,7 +113,15 @@ spring:
 
 Use the configuration properties already defined by the project; adapt the example if your existing configuration uses different names.
 
-### 4. Run the application
+### 4. Configure JWT verification
+
+FinanceFlow requires `JWT_SECRET` in its environment. Set it to the same Base64-encoded secret used by the Identity Service; it must decode to exactly 48 bytes. Do not generate a separate key for FinanceFlow or store the secret in source control. The application verifies HS384 bearer tokens locally and does not call the Identity Service for each request. Swagger/OpenAPI documentation remains public for development; API endpoints require a valid bearer token.
+
+Transactions are associated with the authenticated JWT subject. When ownership is first added, existing database rows are retained with no owner and are excluded from user queries. They are not automatically assigned to an account. Before making the owner column mandatory, backfill only from a verified transaction-to-user mapping (or explicitly archive/remove legacy rows), then apply a versioned migration and the non-null constraint.
+
+Budgets are also scoped to the JWT subject, and their spending totals include only that user's transactions. Existing budgets remain unassigned and are excluded from user-facing budget queries; they are never assigned to an arbitrary account. Because this project does not yet run a migration framework, apply `src/main/resources/db/manual/V1__budget_user_ownership.sql` to an existing PostgreSQL database before deploying this change. It adds the nullable owner column and replaces the old global category/month unique constraint with a user-scoped constraint. Backfill legacy budgets only from a verified budget-to-user mapping; otherwise leave them unassigned or archive them before making ownership mandatory in a future versioned migration.
+
+### 5. Run the application
 
 If the repository includes the Maven Wrapper:
 
@@ -133,7 +141,7 @@ The default application URL is:
 http://localhost:8080
 ```
 
-### 5. Open Swagger UI
+### 6. Open Swagger UI
 
 When the application is running, open:
 

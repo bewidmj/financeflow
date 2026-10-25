@@ -3,9 +3,13 @@ package com.learning.financeflow.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
-@Table(name = "financial_transactions")
+@Table(
+    name = "financial_transactions",
+    indexes = @Index(name = "idx_financial_transactions_owner_id", columnList = "owner_id")
+)
 public class FinancialTransaction {
 
     @Id
@@ -19,6 +23,9 @@ public class FinancialTransaction {
         allocationSize = 50
     )
     private Long id;
+
+    @Column(name = "owner_id")
+    private UUID ownerId;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
@@ -41,11 +48,13 @@ public class FinancialTransaction {
     }
 
     public FinancialTransaction(
+            UUID ownerId,
             BigDecimal amount,
             TransactionType type,
             String category,
             String description,
             LocalDate transactionDate) {
+        this.ownerId = ownerId;
         this.amount = amount;
         this.type = type;
         this.category = category;
@@ -55,6 +64,10 @@ public class FinancialTransaction {
 
     public Long getId() {
         return id;
+    }
+
+    public UUID getOwnerId() {
+        return ownerId;
     }
 
     public BigDecimal getAmount() {

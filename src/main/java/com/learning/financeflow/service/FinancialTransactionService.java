@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class FinancialTransactionService {
@@ -31,10 +32,12 @@ public class FinancialTransactionService {
 
     @Transactional
     public TransactionResponse create(
-            CreateTransactionRequest request) {
+            CreateTransactionRequest request,
+            UUID ownerId) {
 
         FinancialTransaction transaction =
                 new FinancialTransaction(
+                        ownerId,
                         request.amount(),
                         request.type(),
                         request.category(),
@@ -44,14 +47,6 @@ public class FinancialTransactionService {
         FinancialTransaction saved = repository.save(transaction);
 
         return toResponse(saved);
-    }
-
-    @Transactional(readOnly = true)
-    public List<TransactionResponse> findAll() {
-        return repository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
     }
 
     private TransactionResponse toResponse(
@@ -66,8 +61,8 @@ public class FinancialTransactionService {
     }
 
     @Transactional(readOnly = true)
-    public TransactionResponse findById(Long id) {
-        FinancialTransaction transaction = repository.findById(id)
+    public TransactionResponse findById(Long id, UUID ownerId) {
+        FinancialTransaction transaction = repository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Transaction not found with id: " + id
@@ -83,11 +78,13 @@ public class FinancialTransactionService {
             String category,
             LocalDate from,
             LocalDate to,
-            Pageable pageable) {
+            Pageable pageable,
+            UUID ownerId) {
 
         Specification<FinancialTransaction> specification =
                 Specification
-                        .where(TransactionSpecifications.hasType(type))
+                        .where(TransactionSpecifications.hasOwnerId(ownerId))
+                        .and(TransactionSpecifications.hasType(type))
                         .and(TransactionSpecifications.hasCategory(category))
                         .and(TransactionSpecifications.dateOnOrAfter(from))
                         .and(TransactionSpecifications.dateOnOrBefore(to));
@@ -98,10 +95,12 @@ public class FinancialTransactionService {
 
     @Transactional
     public BulkCreateTransactionResponse createBulk(
-            List<CreateTransactionRequest> requests) {
+            List<CreateTransactionRequest> requests,
+            UUID ownerId) {
 
         List<FinancialTransaction> transactions = requests.stream()
                 .map(request -> new FinancialTransaction(
+                        ownerId,
                         request.amount(),
                         request.type(),
                         request.category(),

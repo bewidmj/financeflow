@@ -7,6 +7,7 @@ import com.learning.financeflow.entity.TransactionType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 public final class TransactionSpecifications {
 
@@ -19,6 +20,10 @@ public final class TransactionSpecifications {
                 type == null
                         ? cb.conjunction()
                         : cb.equal(root.get("type"), type);
+    }
+
+    public static Specification<FinancialTransaction> hasOwnerId(UUID ownerId) {
+        return (root, query, cb) -> cb.equal(root.get("ownerId"), ownerId);
     }
 
     public static Specification<FinancialTransaction> hasCategory(

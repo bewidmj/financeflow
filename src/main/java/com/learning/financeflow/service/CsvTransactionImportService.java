@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class CsvTransactionImportService {
@@ -55,7 +56,7 @@ public class CsvTransactionImportService {
     }
 
     
-    public CsvImportResponse importCsv(MultipartFile file) {
+    public CsvImportResponse importCsv(MultipartFile file, UUID ownerId) {
 
         long startTime = System.nanoTime();
 
@@ -142,7 +143,7 @@ public class CsvTransactionImportService {
                     .toList();
 
             try {
-                transactionService.createBulk(requests);
+                transactionService.createBulk(requests, ownerId);
                 imported += batch.size();
 
             } catch (DataAccessException ex) {

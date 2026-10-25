@@ -15,6 +15,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import com.learning.financeflow.entity.TransactionType;
 import org.springframework.data.domain.Page;
@@ -23,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import com.learning.financeflow.service.CsvTransactionImportService;
 
 
@@ -44,14 +47,16 @@ public class FinancialTransactionController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponse create(
-            @Valid @RequestBody CreateTransactionRequest request) {
-        return service.create(request);
+            @Valid @RequestBody CreateTransactionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return service.create(request, ownerId(jwt));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<TransactionResponse> findById(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(service.findById(id));
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(service.findById(id, ownerId(jwt)));
     }
 
 
@@ -63,7 +68,8 @@ public class FinancialTransactionController {
             @RequestParam(required = false) LocalDate to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "transactionDate,desc") String sort) {
+            @RequestParam(defaultValue = "transactionDate,desc") String sort,
+            @AuthenticationPrincipal Jwt jwt) {
 
         if (page < 0) {
             throw new ResponseStatusException(
@@ -117,7 +123,7 @@ public class FinancialTransactionController {
                 Sort.by(direction, sortField)
         );
 
-        return service.search(type, category, from, to, pageable);
+        return service.search(type, category, from, to, pageable, ownerId(jwt));
     }
 
     @PostMapping("/bulk")
@@ -126,9 +132,10 @@ public class FinancialTransactionController {
             @RequestBody
             @Size(min = 1, max = 100,
                 message = "Batch must contain between 1 and 100 transactions")
-            List<@Valid CreateTransactionRequest> requests) {
+            List<@Valid CreateTransactionRequest> requests,
+            @AuthenticationPrincipal Jwt jwt) {
 
-        return service.createBulk(requests);
+        return service.createBulk(requests, ownerId(jwt));
     }
 
 
@@ -137,9 +144,25 @@ public class FinancialTransactionController {
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
     public CsvImportResponse importCsv(
-            @RequestParam("file") MultipartFile file) {
-        return csvTransactionImportService.importCsv(file);
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal Jwt jwt) {
+        return csvTransactionImportService.importCsv(file, ownerId(jwt));
     }
 
+    private UUID ownerId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid token subject");
+        }
+        try {
+            return UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid token subject",
+                    ex);
+        }
+    }
 
 }

@@ -12,8 +12,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Transactional
@@ -26,39 +29,46 @@ public class BudgetService {
         this.transactionQueries = transactionQueries;
     }
 
-    public BudgetResponse create(CreateBudgetRequest request) {
+    public BudgetResponse create(CreateBudgetRequest request, UUID ownerId) {
         YearMonth month = parseMonth(request.month());
-        if (budgetRepository.existsByCategoryIgnoreCaseAndMonthStart(request.category().trim(), month.atDay(1))) {
-            throw new IllegalArgumentException("A budget already exists for this category and month");
+        if (budgetRepository.existsByOwnerIdAndCategoryIgnoreCaseAndMonthStart(
+                ownerId, request.category().trim(), month.atDay(1))) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "A budget already exists for this category and month");
         }
-        Budget budget = new Budget(request.category().trim(), month.atDay(1), request.amount());
+        Budget budget = new Budget(
+            ownerId, request.category().trim(), month.atDay(1), request.amount());
         return toResponse(budgetRepository.save(budget));
     }
 
     @Transactional(readOnly = true)
-    public List<BudgetResponse> findByMonth(String monthText) {
+    public List<BudgetResponse> findByMonth(String monthText, UUID ownerId) {
         LocalDate monthStart = parseMonth(monthText).atDay(1);
-        return budgetRepository.findByMonthStartOrderByCategoryAsc(monthStart)
+        return budgetRepository.findByOwnerIdAndMonthStartOrderByCategoryAsc(
+                ownerId, monthStart)
             .stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public BudgetResponse findById(Long id, String monthText) {
-        Budget budget = budgetRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Budget not found: " + id));
-        if (monthText != null && !budget.getMonthStart().equals(parseMonth(monthText).atDay(1))) {
-            throw new IllegalArgumentException("Budget not found for the requested month");
-        }
+    public BudgetResponse findById(Long id, String monthText, UUID ownerId) {
+        Budget budget = monthText == null
+            ? findOwnedBudget(id, ownerId)
+            : budgetRepository.findByIdAndOwnerIdAndMonthStart(
+                id, ownerId, parseMonth(monthText).atDay(1))
+                .orElseThrow(() -> budgetNotFound(id));
         return toResponse(budget);
     }
 
-    public BudgetResponse update(Long id, UpdateBudgetRequest request) {
-        Budget budget = budgetRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Budget not found: " + id));
+    public BudgetResponse update(
+            Long id, UpdateBudgetRequest request, UUID ownerId) {
+        Budget budget = findOwnedBudget(id, ownerId);
         LocalDate monthStart = parseMonth(request.month()).atDay(1);
-        if (budgetRepository.existsByCategoryIgnoreCaseAndMonthStartAndIdNot(
-            request.category().trim(), monthStart, id)) {
-            throw new IllegalArgumentException("A budget already exists for this category and month");
+        if (budgetRepository.existsByOwnerIdAndCategoryIgnoreCaseAndMonthStartAndIdNot(
+                ownerId, request.category().trim(), monthStart, id)) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "A budget already exists for this category and month");
         }
         budget.setCategory(request.category().trim());
         budget.setMonthStart(monthStart);
@@ -66,16 +76,26 @@ public class BudgetService {
         return toResponse(budgetRepository.save(budget));
     }
 
-    public void delete(Long id) {
-        Budget budget = budgetRepository.findById(id)
-            .orElseThrow(() -> new IllegalArgumentException("Budget not found: " + id));
+    public void delete(Long id, UUID ownerId) {
+        Budget budget = findOwnedBudget(id, ownerId);
         budgetRepository.delete(budget);
+    }
+
+    private Budget findOwnedBudget(Long id, UUID ownerId) {
+        return budgetRepository.findByIdAndOwnerId(id, ownerId)
+            .orElseThrow(() -> budgetNotFound(id));
+    }
+
+    private ResponseStatusException budgetNotFound(Long id) {
+        return new ResponseStatusException(
+            HttpStatus.NOT_FOUND, "Budget not found: " + id);
     }
 
     private BudgetResponse toResponse(Budget budget) {
         LocalDate start = budget.getMonthStart();
         BigDecimal spent = transactionQueries.sumExpensesForCategoryAndDateRange(
-            budget.getCategory(), start, start.plusMonths(1), TransactionType.EXPENSE);
+            budget.getCategory(), start, start.plusMonths(1),
+            TransactionType.EXPENSE, budget.getOwnerId());
         if (spent == null) spent = BigDecimal.ZERO;
         BigDecimal remaining = budget.getAmount().subtract(spent);
         BigDecimal percentage = spent.multiply(BigDecimal.valueOf(100))

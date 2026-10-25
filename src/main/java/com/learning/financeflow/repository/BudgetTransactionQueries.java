@@ -4,6 +4,7 @@ import com.learning.financeflow.entity.FinancialTransaction;
 import com.learning.financeflow.entity.TransactionType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,11 +20,13 @@ public interface BudgetTransactionQueries extends JpaRepository<FinancialTransac
            "where lower(t.category) = lower(:category) " +
            "and t.transactionDate >= :startDate " +
            "and t.transactionDate < :endDateExclusive " +
-           "and t.type = :type")
+           "and t.type = :type " +
+           "and t.ownerId = :ownerId")
     BigDecimal sumExpensesForCategoryAndDateRange(
         @Param("category") String category,
         @Param("startDate") LocalDate startDate,
         @Param("endDateExclusive") LocalDate endDateExclusive,
-        @Param("type") TransactionType type
+        @Param("type") TransactionType type,
+        @Param("ownerId") UUID ownerId
     );
 }
