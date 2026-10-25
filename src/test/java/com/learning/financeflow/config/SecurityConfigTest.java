@@ -1,20 +1,12 @@
 package com.learning.financeflow.config;
 
-import static org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256;
-import static org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS384;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+import com.learning.financeflow.JwtTestSupport;
 import com.learning.financeflow.controller.FinancialTransactionController;
 import com.learning.financeflow.service.CsvTransactionImportService;
 import com.learning.financeflow.service.FinancialTransactionService;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Date;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,31 +15,32 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FinancialTransactionController.class)
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
 
-    private static final byte[] TEST_KEY = new byte[48];
-
-    static {
-        java.util.Arrays.fill(TEST_KEY, (byte) 0x42);
-    }
+    private static final UUID SUBJECT =
+            UUID.fromString("d9428888-122b-11e1-b85c-61cd3cbb3210");
 
     @DynamicPropertySource
-    static void configureJwtSecret(DynamicPropertyRegistry registry) {
-        registry.add("JWT_SECRET", () ->
-                Base64.getEncoder().encodeToString(TEST_KEY));
+    static void configureJwksUri(DynamicPropertyRegistry registry) {
+        registry.add("JWT_JWKS_URI", JwtTestSupport::jwksUri);
     }
 
     @Autowired
@@ -67,85 +60,125 @@ class SecurityConfigTest {
                 nullable(java.time.LocalDate.class),
                 nullable(java.time.LocalDate.class),
                 any(Pageable.class),
-                nullable(java.util.UUID.class)))
+                nullable(UUID.class)))
                 .thenReturn(Page.empty());
     }
 
     @Test
-    void missingTokenShouldReturnUnauthorized() throws Exception {
+    void missingTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/v1/transactions"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void malformedTokenShouldReturnUnauthorized() throws Exception {
+    void malformedTokenIsRejected() throws Exception {
         mockMvc.perform(get("/api/v1/transactions")
                         .header("Authorization", "Bearer not-a-jwt"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void invalidSignatureShouldReturnUnauthorized() throws Exception {
+    void invalidSignatureIsRejected() throws Exception {
+        var otherPair = java.security.KeyPairGenerator.getInstance("RSA");
+        otherPair.initialize(2048);
+        String token = JwtTestSupport.token(
+                SUBJECT, otherPair.generateKeyPair(), JwtTestSupport.KEY_ID,
+                Jwts.SIG.RS256, Instant.now(), Instant.now().plusSeconds(300));
+
         mockMvc.perform(get("/api/v1/transactions")
-                        .header("Authorization",
-                                "Bearer " + token(new byte[48])))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void hs256TokenShouldReturnUnauthorized() throws Exception {
+    void expiredTokenIsRejected() throws Exception {
+        Instant now = Instant.now();
+        String token = JwtTestSupport.token(
+                SUBJECT, JwtTestSupport.keyPair(), JwtTestSupport.KEY_ID,
+                Jwts.SIG.RS256, now.minusSeconds(600), now.minusSeconds(300));
+
         mockMvc.perform(get("/api/v1/transactions")
-                        .header("Authorization",
-                                "Bearer " + token(TEST_KEY, HS256)))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void validHs384TokenShouldReachApi() throws Exception {
-        String validToken = token(TEST_KEY);
-        var parsedToken = Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(TEST_KEY))
+    void hs384TokenIsRejected() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization",
+                                "Bearer " + JwtTestSupport.hs384Token(SUBJECT)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unsupportedRsaAlgorithmIsRejected() throws Exception {
+        Instant now = Instant.now();
+        String token = JwtTestSupport.token(
+                SUBJECT, JwtTestSupport.keyPair(), JwtTestSupport.KEY_ID,
+                Jwts.SIG.RS384, now, now.plusSeconds(300));
+
+        mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unsignedTokenIsRejected() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization",
+                                "Bearer " + JwtTestSupport.unsignedToken(SUBJECT)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void unknownKeyIdIsRejected() throws Exception {
+        Instant now = Instant.now();
+        String token = JwtTestSupport.token(
+                SUBJECT, JwtTestSupport.keyPair(), "unknown-key",
+                Jwts.SIG.RS256, now, now.plusSeconds(300));
+
+        mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void missingKeyIdIsRejected() throws Exception {
+        mockMvc.perform(get("/api/v1/transactions")
+                        .header("Authorization",
+                                "Bearer " + JwtTestSupport.tokenWithoutKeyId(SUBJECT)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void validRs256TokenUsesSubjectAsTheAuthenticatedPrincipal() throws Exception {
+        String token = JwtTestSupport.token(SUBJECT);
+        var parsed = Jwts.parser()
+                .verifyWith(JwtTestSupport.keyPair().getPublic())
                 .build()
-                .parseSignedClaims(validToken);
-        assertEquals("HS384", parsedToken.getHeader().getAlgorithm());
+                .parseSignedClaims(token);
+        assertEquals("RS256", parsed.getHeader().getAlgorithm());
+        assertEquals(JwtTestSupport.KEY_ID, parsed.getHeader().getKeyId());
 
         mockMvc.perform(get("/api/v1/transactions")
-                        .header("Authorization",
-                                "Bearer " + validToken))
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(
                         MediaType.APPLICATION_JSON));
+
+        verify(transactionService).search(
+                nullable(com.learning.financeflow.entity.TransactionType.class),
+                nullable(String.class),
+                nullable(java.time.LocalDate.class),
+                nullable(java.time.LocalDate.class),
+                any(Pageable.class),
+                eq(SUBJECT));
     }
 
     @Test
-    void modifiedJjwtTokenShouldBeRejected() throws Exception {
-        String[] parts = token(TEST_KEY).split("\\.");
-        parts[2] = (parts[2].charAt(0) == 'A' ? "B" : "A")
-                + parts[2].substring(1);
-
-        mockMvc.perform(get("/api/v1/transactions")
-                        .header("Authorization",
-                                "Bearer " + String.join(".", parts)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    private String token(byte[] keyBytes) {
-        return token(keyBytes, HS384);
-    }
-
-    private String token(byte[] keyBytes, MacAlgorithm algorithm) {
-        byte[] decodedKey = Decoders.BASE64.decode(
-                Base64.getEncoder().encodeToString(keyBytes));
-        var key = Keys.hmacShaKeyFor(decodedKey);
-        Instant now = Instant.now();
-        var builder = Jwts.builder()
-                .subject("d9428888-122b-11e1-b85c-61cd3cbb3210")
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(300)))
-                .claim("email", "test@example.com")
-                .claim("role", "USER");
-        return algorithm == HS384
-                ? builder.signWith(key).compact()
-                : builder.signWith(key, Jwts.SIG.HS256).compact();
+    void swaggerOpenApiPathRemainsPublic() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(result -> assertNotEquals(
+                        401, result.getResponse().getStatus()));
     }
 }

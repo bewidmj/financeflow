@@ -1,6 +1,5 @@
 package com.learning.financeflow;
 
-import static org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS384;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,21 +15,13 @@ import com.learning.financeflow.repository.BudgetRepository;
 import com.learning.financeflow.repository.FinancialTransactionRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.Instant;
-import java.util.Base64;
 import java.util.UUID;
-import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -45,16 +36,9 @@ class TransactionOwnershipIntegrationTest {
             UUID.fromString("d9428888-122b-11e1-b85c-61cd3cbb3210");
     private static final UUID USER_TWO =
             UUID.fromString("c1e11e17-85d1-4e90-b20b-4f31cf6f36f3");
-    private static final byte[] TEST_KEY = new byte[48];
-
-    static {
-        java.util.Arrays.fill(TEST_KEY, (byte) 0x42);
-    }
-
     @DynamicPropertySource
-    static void configureJwtSecret(DynamicPropertyRegistry registry) {
-        registry.add("JWT_SECRET", () ->
-                Base64.getEncoder().encodeToString(TEST_KEY));
+    static void configureJwksUri(DynamicPropertyRegistry registry) {
+        registry.add("JWT_JWKS_URI", JwtTestSupport::jwksUri);
     }
 
     @Autowired
@@ -279,6 +263,29 @@ class TransactionOwnershipIntegrationTest {
     }
 
     @Test
+    void differentUsersCanCreateSameCategoryBudgetForSameMonth()
+            throws Exception {
+        String firstBudget = createBudget(
+                USER_ONE, "SHARED_CATEGORY", "2026-10", "100.00");
+        String secondBudget = createBudget(
+                USER_TWO, "SHARED_CATEGORY", "2026-10", "200.00");
+
+        long firstId = ((Number) JsonPath.read(firstBudget, "$.id"))
+                .longValue();
+        long secondId = ((Number) JsonPath.read(secondBudget, "$.id"))
+                .longValue();
+
+        org.junit.jupiter.api.Assertions.assertNotEquals(firstId, secondId);
+        mockMvc.perform(get("/api/v1/budgets/{id}", firstId)
+                        .header("Authorization", bearer(USER_TWO)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/budgets/{id}", secondId)
+                        .header("Authorization", bearer(USER_TWO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.budgetAmount").value(200.00));
+    }
+
+    @Test
     void legacyUnassignedBudgetsAreNotReturnedToUsers() throws Exception {
         budgetRepository.save(new com.learning.financeflow.entity.Budget(
                 null,
@@ -341,20 +348,6 @@ class TransactionOwnershipIntegrationTest {
     }
 
     private String bearer(UUID userId) {
-        var key = new SecretKeySpec(TEST_KEY, "HmacSHA384");
-        JwtEncoder encoder = NimbusJwtEncoder.withSecretKey(key)
-                .algorithm(HS384)
-                .build();
-        Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(userId.toString())
-                .issuedAt(now)
-                .expiresAt(now.plusSeconds(300))
-                .claim("email", userId + "@example.com")
-                .claim("role", "USER")
-                .build();
-        String token = encoder.encode(JwtEncoderParameters.from(
-                JwsHeader.with(HS384).build(), claims)).getTokenValue();
-        return "Bearer " + token;
+        return "Bearer " + JwtTestSupport.token(userId);
     }
 }

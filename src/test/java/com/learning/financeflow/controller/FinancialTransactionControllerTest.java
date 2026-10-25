@@ -1,6 +1,7 @@
 
 package com.learning.financeflow.controller;
 
+import com.learning.financeflow.JwtTestSupport;
 import com.learning.financeflow.dto.CreateTransactionRequest;
 import com.learning.financeflow.dto.TransactionResponse;
 import com.learning.financeflow.entity.TransactionType;
@@ -25,7 +26,6 @@ import org.springframework.test.context.DynamicPropertySource;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,9 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class FinancialTransactionControllerTest {
 
     @DynamicPropertySource
-    static void configureJwtSecret(DynamicPropertyRegistry registry) {
-        registry.add("JWT_SECRET", () ->
-                Base64.getEncoder().encodeToString(new byte[48]));
+    static void configureJwksUri(DynamicPropertyRegistry registry) {
+        registry.add("JWT_JWKS_URI", JwtTestSupport::jwksUri);
     }
 
     private static final UUID OWNER_ID =
