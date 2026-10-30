@@ -87,6 +87,94 @@ class TransactionOwnershipIntegrationTest {
     }
 
     @Test
+    void transactionUpdateAndDeleteValidateInputAndEnforceOwnership()
+            throws Exception {
+        String response = mockMvc.perform(post("/api/v1/transactions")
+                        .header("Authorization", bearer(USER_ONE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 25.50,
+                                  "type": "EXPENSE",
+                                  "category": "ORIGINAL",
+                                  "description": "Owned",
+                                  "transactionDate": "2026-10-12"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = ((Number) JsonPath.read(response, "$.id")).longValue();
+        String updated = """
+                {
+                  "amount": 30.25,
+                  "type": "INCOME",
+                  "category": "UPDATED",
+                  "description": "Revised",
+                  "transactionDate": "2026-10-13"
+                }
+                """;
+
+        mockMvc.perform(put("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_TWO))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updated))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_TWO)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_ONE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": 0,
+                                  "type": "EXPENSE",
+                                  "category": "INVALID",
+                                  "transactionDate": "2026-10-13"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_ONE))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updated))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amount").value(30.25))
+                .andExpect(jsonPath("$.type").value("INCOME"))
+                .andExpect(jsonPath("$.category").value("UPDATED"))
+                .andExpect(jsonPath("$.description").value("Revised"))
+                .andExpect(jsonPath("$.transactionDate").value("2026-10-13"));
+
+        mockMvc.perform(delete("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_ONE)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_ONE)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/v1/transactions/{id}", id)
+                        .header("Authorization", bearer(USER_ONE)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminTransactionListingRequiresAdminRole() throws Exception {
+        createTransaction(USER_ONE, "ADMIN_VIEW");
+
+        mockMvc.perform(get("/api/v1/admin/users/{ownerId}/transactions", USER_ONE)
+                        .header("Authorization", bearer(USER_TWO)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/admin/users/{ownerId}/transactions", USER_ONE)
+                        .header("Authorization", adminBearer())
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].category").value("ADMIN_VIEW"));
+    }
+
+    @Test
     void transactionListsAreScopedToTheAuthenticatedUser() throws Exception {
         createTransaction(USER_ONE, "USER_ONE");
         createTransaction(USER_TWO, "USER_TWO");
@@ -349,5 +437,9 @@ class TransactionOwnershipIntegrationTest {
 
     private String bearer(UUID userId) {
         return "Bearer " + JwtTestSupport.token(userId);
+    }
+
+    private String adminBearer() {
+        return "Bearer " + JwtTestSupport.token(USER_TWO, "ADMIN");
     }
 }

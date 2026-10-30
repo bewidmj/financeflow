@@ -123,7 +123,7 @@ export JWT_JWKS_URI="http://localhost:8081/.well-known/jwks.json"
 
 The URI is trusted application configuration, not read from the incoming token. FinanceFlow pins verification to RS256, validates standard token time claims, and selects the public key using the token `kid`. It uses a 2-second connect timeout, 5-second read timeout, and Nimbus's default JWKS cache/refresh behavior (approximately five minutes). A running instance can use a cached key during a temporary JWKS outage until a refresh is needed; a cold instance without a cached key cannot validate tokens until the Identity Service becomes reachable. Keep network access and readiness expectations aligned with this behavior.
 
-Swagger/OpenAPI remains public; API endpoints require a valid bearer token. FinanceFlow ownership is derived from the verified token's `sub` UUID, and transaction and budget records continue to be scoped to that identity.
+Swagger/OpenAPI remains public; API endpoints require a valid bearer token. FinanceFlow ownership is derived from the verified token's `sub` UUID, and normal transaction and budget records continue to be scoped to that identity. Admin transaction browsing is additionally restricted to a verified `role: ADMIN` JWT claim and is exposed only through `/api/v1/admin/**`.
 
 Transactions are associated with the authenticated JWT subject. When ownership is first added, existing database rows are retained with no owner and are excluded from user queries. They are not automatically assigned to an account. Before making the owner column mandatory, backfill only from a verified transaction-to-user mapping (or explicitly archive/remove legacy rows), then apply a versioned migration and the non-null constraint.
 
@@ -216,9 +216,14 @@ The following endpoint groups are implemented in the current project.
 |---|---|---|
 | POST | `/api/v1/transactions` | Create a transaction |
 | GET | `/api/v1/transactions` | Retrieve transactions |
+| GET | `/api/v1/transactions/{id}` | Retrieve an owned transaction |
+| PUT | `/api/v1/transactions/{id}` | Update an owned transaction |
+| DELETE | `/api/v1/transactions/{id}` | Delete an owned transaction |
 | POST | `/api/v1/transactions/import` | Import transactions from CSV |
 
 Transaction filtering is supported through the implemented query parameters. Refer to Swagger UI for the current request schemas and exact parameter names.
+
+The transaction-by-ID read, update, and delete operations use both transaction ID and the authenticated subject UUID; another user's record is reported as not found. The separate `GET /api/v1/admin/users/{ownerId}/transactions` endpoint is read-only and requires the verified `ADMIN` role.
 
 ### Budgets
 

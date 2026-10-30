@@ -59,6 +59,22 @@ public class FinancialTransactionController {
         return ResponseEntity.ok(service.findById(id, ownerId(jwt)));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<TransactionResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateTransactionRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(service.update(id, request, ownerId(jwt)));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.delete(id, ownerId(jwt));
+    }
+
 
     @GetMapping
     public Page<TransactionResponse> search(
@@ -125,6 +141,7 @@ public class FinancialTransactionController {
 
         return service.search(type, category, from, to, pageable, ownerId(jwt));
     }
+
 
     @PostMapping("/bulk")
     @ResponseStatus(HttpStatus.CREATED)

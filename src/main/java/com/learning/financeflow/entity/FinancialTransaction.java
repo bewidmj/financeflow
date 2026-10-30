@@ -89,4 +89,17 @@ public class FinancialTransaction {
     public LocalDate getTransactionDate() {
         return transactionDate;
     }
+
+    public void update(
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate) {
+        this.amount = amount;
+        this.type = type;
+        this.category = category;
+        this.description = description;
+        this.transactionDate = transactionDate;
+    }
 }

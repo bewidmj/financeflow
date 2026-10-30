@@ -34,8 +34,22 @@ public final class JwtTestSupport {
     }
 
     public static String token(UUID subject) {
-        return token(subject, KEY_PAIR, KEY_ID, Jwts.SIG.RS256,
-                Instant.now(), Instant.now().plusSeconds(300));
+        return token(subject, "USER");
+    }
+
+    public static String token(UUID subject, String role) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .header()
+                .keyId(KEY_ID)
+                .and()
+                .subject(subject.toString())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(300)))
+                .claim("email", "test@example.com")
+                .claim("role", role)
+                .signWith(KEY_PAIR.getPrivate(), Jwts.SIG.RS256)
+                .compact();
     }
 
     public static String token(

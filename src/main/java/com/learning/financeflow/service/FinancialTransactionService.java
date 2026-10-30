@@ -71,6 +71,50 @@ public class FinancialTransactionService {
         return toResponse(transaction);
     }
 
+    @Transactional
+    public TransactionResponse update(
+            Long id,
+            CreateTransactionRequest request,
+            UUID ownerId) {
+        FinancialTransaction transaction = repository.findByIdAndOwnerId(id, ownerId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Transaction not found with id: " + id));
+        transaction.update(
+                request.amount(),
+                request.type(),
+                request.category(),
+                request.description(),
+                request.transactionDate());
+        return toResponse(transaction);
+    }
+
+    @Transactional
+    public void delete(Long id, UUID ownerId) {
+        FinancialTransaction transaction = repository.findByIdAndOwnerId(id, ownerId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Transaction not found with id: " + id));
+        repository.delete(transaction);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TransactionResponse> searchForAdmin(
+            UUID ownerId,
+            TransactionType type,
+            String category,
+            LocalDate from,
+            LocalDate to,
+            Pageable pageable) {
+        Specification<FinancialTransaction> specification =
+                Specification.where(TransactionSpecifications.hasOwnerId(ownerId))
+                        .and(TransactionSpecifications.hasType(type))
+                        .and(TransactionSpecifications.hasCategory(category))
+                        .and(TransactionSpecifications.dateOnOrAfter(from))
+                        .and(TransactionSpecifications.dateOnOrBefore(to));
+        return repository.findAll(specification, pageable).map(this::toResponse);
+    }
+
 
     @Transactional(readOnly = true)
     public Page<TransactionResponse> search(
