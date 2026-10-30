@@ -4,4 +4,4 @@ target/
 application-local.properties
 src/main/resources/application-local.properties
 /LOCAL-STACK-SETUP.md
-logs/*
+/logs/

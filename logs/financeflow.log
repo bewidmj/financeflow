@@ -1,6 +1,0 @@
-2026-10-26T00:02:33.752+05:30  WARN 15365 --- [financeflow] [HikariPool-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=7m20s1ms).
-2026-10-26T00:24:33.379+05:30  INFO 15365 --- [financeflow] [SpringApplicationShutdownHook] o.s.boot.tomcat.GracefulShutdown         : Commencing graceful shutdown. Waiting for active requests to complete
-2026-10-26T00:24:33.470+05:30  INFO 15365 --- [financeflow] [tomcat-shutdown] o.s.boot.tomcat.GracefulShutdown         : Graceful shutdown complete
-2026-10-26T00:24:33.536+05:30  INFO 15365 --- [financeflow] [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
-2026-10-26T00:24:33.615+05:30  INFO 15365 --- [financeflow] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
-2026-10-26T00:24:33.626+05:30  INFO 15365 --- [financeflow] [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
