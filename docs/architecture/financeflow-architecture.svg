@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title description">
+  <title id="title">FinanceFlow system architecture</title>
+  <desc id="description">Architecture diagram showing the React UI, identity service, FinanceFlow API, Kafka transaction events, Account Service, and their independently owned PostgreSQL databases.</desc>
+  <defs>
+    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#172554"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#0f172a" flood-opacity=".10"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/>
+    </marker>
+    <style>
+      text { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+      .title { fill: #fff; font-size: 30px; font-weight: 700; }
+      .subtitle { fill: #c7d2fe; font-size: 15px; }
+      .section { fill: #64748b; font-size: 12px; font-weight: 700; letter-spacing: 1.7px; }
+      .card { filter: url(#shadow); }
+      .card-title { fill: #0f172a; font-size: 18px; font-weight: 700; }
+      .card-subtitle { fill: #475569; font-size: 13px; font-weight: 600; }
+      .body { fill: #334155; font-size: 13px; }
+      .small { fill: #64748b; font-size: 11px; }
+      .arrow-label { fill: #475569; font-size: 11px; font-weight: 600; }
+      .db-title { fill: #0f172a; font-size: 15px; font-weight: 700; }
+      .db-body { fill: #475569; font-size: 12px; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#f8fafc"/>
+  <path d="M0 0 H1600 V102 H0 Z" fill="url(#header)"/>
+  <text x="54" y="48" class="title">FinanceFlow | System Architecture</text>
+  <text x="56" y="76" class="subtitle">Service boundaries, identity trust, event delivery, and independently owned data</text>
+
+  <text x="60" y="142" class="section">CLIENT</text>
+  <text x="60" y="402" class="section">APPLICATIONS &amp; EVENTING</text>
+  <text x="60" y="716" class="section">SERVICE-OWNED DATA</text>
+
+  <g class="card">
+    <rect x="60" y="190" width="230" height="140" rx="16" fill="#fff" stroke="#cbd5e1"/>
+    <circle cx="96" cy="232" r="18" fill="#e0e7ff"/>
+    <path d="M88 235a8 8 0 0 1 16 0M91 226a5 5 0 1 1 10 0" fill="none" stroke="#4338ca" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="124" y="226" class="card-title">User</text>
+    <text x="82" y="273" class="body">Browser session</text>
+    <text x="82" y="295" class="small">Signs in and manages finances</text>
+  </g>
+
+  <g class="card">
+    <rect x="370" y="175" width="340" height="165" rx="16" fill="#fff" stroke="#cbd5e1"/>
+    <rect x="370" y="175" width="340" height="7" rx="4" fill="#6366f1"/>
+    <text x="394" y="216" class="card-title">FinanceFlow UI</text>
+    <text x="394" y="240" class="card-subtitle">React · TypeScript · Vite</text>
+    <line x1="394" y1="255" x2="686" y2="255" stroke="#e2e8f0"/>
+    <text x="394" y="280" class="body">Transactions · budgets · accounts</text>
+    <text x="394" y="304" class="small">Local Vite proxy routes /identity, /finance, /accounts</text>
+  </g>
+
+  <path d="M290 260 H370" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="304" y="248" class="arrow-label">uses</text>
+
+  <path d="M450 340 V380 H245 V440" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="295" y="356" width="104" height="22" rx="11" fill="#f8fafc"/>
+  <text x="305" y="371" class="arrow-label">sign-in / register</text>
+
+  <path d="M620 340 V440" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="628" y="369" width="105" height="22" rx="11" fill="#f8fafc"/>
+  <text x="635" y="384" class="arrow-label">REST + bearer JWT</text>
+
+  <path d="M710 260 H1370 V440" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="1016" y="248" width="121" height="22" rx="11" fill="#f8fafc"/>
+  <text x="1024" y="263" class="arrow-label">REST + bearer JWT</text>
+
+  <g class="card">
+    <rect x="70" y="440" width="350" height="220" rx="16" fill="#fff" stroke="#a5b4fc"/>
+    <rect x="70" y="440" width="350" height="8" rx="4" fill="#4f46e5"/>
+    <rect x="88" y="464" width="93" height="22" rx="11" fill="#eef2ff"/>
+    <text x="101" y="479" fill="#4338ca" font-size="10" font-weight="700">TRUST</text>
+    <text x="88" y="514" class="card-title">Identity Service</text>
+    <text x="88" y="537" class="card-subtitle">Spring Boot · :8081</text>
+    <text x="88" y="566" class="body">Registers users and authenticates sign-ins</text>
+    <text x="88" y="588" class="body">Issues RS256 access tokens (JWT)</text>
+    <text x="88" y="610" class="body">Publishes public keys at /.well-known/jwks.json</text>
+    <text x="88" y="638" class="small">Private signing key stays with Identity Service</text>
+  </g>
+
+  <g class="card">
+    <rect x="500" y="440" width="350" height="220" rx="16" fill="#fff" stroke="#93c5fd"/>
+    <rect x="500" y="440" width="350" height="8" rx="4" fill="#2563eb"/>
+    <rect x="518" y="464" width="98" height="22" rx="11" fill="#eff6ff"/>
+    <text x="531" y="479" fill="#1d4ed8" font-size="10" font-weight="700">CORE API</text>
+    <text x="518" y="514" class="card-title">FinanceFlow API</text>
+    <text x="518" y="537" class="card-subtitle">Spring Boot · :8080</text>
+    <text x="518" y="566" class="body">Transactions · budgets · CSV imports</text>
+    <text x="518" y="588" class="body">Verifies RS256 JWTs using Identity JWKS</text>
+    <text x="518" y="610" class="body">Writes transaction + outbox atomically</text>
+    <rect x="518" y="626" width="294" height="22" rx="6" fill="#eff6ff"/>
+    <text x="528" y="641" fill="#1d4ed8" font-size="11" font-weight="600">Outbox publisher claims leased rows</text>
+  </g>
+
+  <path d="M420 532 H500" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowPurple)"/>
+  <rect x="421" y="500" width="89" height="22" rx="11" fill="#f8fafc"/>
+  <text x="426" y="515" fill="#6d28d9" font-size="10" font-weight="700">JWKS · RS256</text>
+
+  <g class="card">
+    <rect x="900" y="475" width="250" height="165" rx="16" fill="#fff" stroke="#c4b5fd"/>
+    <rect x="900" y="475" width="250" height="8" rx="4" fill="#7c3aed"/>
+    <text x="922" y="514" class="card-title">Apache Kafka</text>
+    <text x="922" y="537" class="card-subtitle">KRaft broker · :9092</text>
+    <rect x="920" y="552" width="210" height="31" rx="7" fill="#f5f3ff"/>
+    <text x="931" y="572" fill="#5b21b6" font-size="10" font-weight="700">financeflow.transactions.v1</text>
+    <rect x="920" y="592" width="210" height="29" rx="7" fill="#fff7ed"/>
+    <text x="931" y="611" fill="#c2410c" font-size="10" font-weight="700">financeflow.transactions.v1.dlt</text>
+  </g>
+
+  <path d="M850 541 H900" fill="none" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="852" y="526" class="arrow-label">publish</text>
+
+  <g class="card">
+    <rect x="1200" y="440" width="340" height="220" rx="16" fill="#fff" stroke="#86efac"/>
+    <rect x="1200" y="440" width="340" height="8" rx="4" fill="#16a34a"/>
+    <rect x="1218" y="464" width="104" height="22" rx="11" fill="#f0fdf4"/>
+    <text x="1231" y="479" fill="#15803d" font-size="10" font-weight="700">LEDGER</text>
+    <text x="1218" y="514" class="card-title">Account Service</text>
+    <text x="1218" y="537" class="card-subtitle">Spring Boot · :8082</text>
+    <text x="1218" y="566" class="body">Verifies RS256 JWTs via Identity JWKS</text>
+    <text x="1218" y="588" class="body">Consumes versioned transaction events</text>
+    <text x="1218" y="610" class="body">Inbox dedup; validates owner, status, INR</text>
+    <text x="1218" y="638" class="small">Applies ordered balance + ledger changes</text>
+  </g>
+
+  <path d="M1150 541 H1200" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#arrowPurple)"/>
+  <text x="1151" y="526" class="arrow-label">consume</text>
+  <path d="M1200 625 H1168 V650 H1025 V640" fill="none" stroke="#c2410c" stroke-width="1.8" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+  <text x="1052" y="646" fill="#c2410c" font-size="10" font-weight="600">rejected events → DLT</text>
+
+  <g class="card">
+    <rect x="70" y="755" width="350" height="145" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <path d="M70 779 Q70 755 95 755 H395 Q420 755 420 779 V789 H70 Z" fill="#cbd5e1"/>
+    <text x="92" y="785" class="db-title">Identity PostgreSQL</text>
+    <text x="92" y="824" class="db-body">Users · credentials · roles</text>
+    <text x="92" y="848" class="small">Identity-owned database</text>
+  </g>
+  <g class="card">
+    <rect x="500" y="755" width="350" height="145" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <path d="M500 779 Q500 755 525 755 H825 Q850 755 850 779 V789 H500 Z" fill="#cbd5e1"/>
+    <text x="522" y="785" class="db-title">Finance PostgreSQL</text>
+    <text x="522" y="824" class="db-body">Transactions · budgets · CSV import keys</text>
+    <text x="522" y="848" class="small">Includes the transactional outbox</text>
+  </g>
+  <g class="card">
+    <rect x="1200" y="755" width="340" height="145" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+    <path d="M1200 779 Q1200 755 1225 755 H1515 Q1540 755 1540 779 V789 H1200 Z" fill="#cbd5e1"/>
+    <text x="1222" y="785" class="db-title">Account PostgreSQL</text>
+    <text x="1222" y="824" class="db-body">Accounts · inbox/state · immutable ledger</text>
+    <text x="1222" y="848" class="small">Transfers · owned by Account Service</text>
+  </g>
+
+  <path d="M245 660 V755" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M675 660 V755" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M1370 660 V755" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <line x1="60" y1="938" x2="100" y2="938" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="110" y="942" class="small">Synchronous API / database flow</text>
+  <line x1="370" y1="938" x2="410" y2="938" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowPurple)"/>
+  <text x="420" y="942" class="small">Identity trust / asynchronous events</text>
+  <text x="1540" y="942" text-anchor="end" class="small">Finance and Account never share a database</text>
+</svg>

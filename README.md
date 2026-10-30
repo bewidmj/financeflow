@@ -51,27 +51,9 @@ The project is being developed as a hands-on learning journey covering REST API 
 
 ## Architecture
 
-The application follows a layered architecture:
+![FinanceFlow system architecture](./docs/architecture/financeflow-architecture.svg)
 
-```text
-Client
-  |
-  v
-REST Controllers
-  |
-  v
-Services
-  |
-  +--> PostgreSQL transaction (transaction + outbox)
-  |
-  +--> Kafka outbox publisher --> financeflow.transactions.v1
-                                      |
-                                      v
-                            Account Service consumer
-                                      |
-                                      v
-                      Account DB (inbox + immutable ledger)
-```
+The editable [draw.io source](./docs/architecture/financeflow-architecture.drawio) shows the service boundaries, JWT/JWKS trust, transaction outbox and Kafka event flow, and the separate databases owned by each service.
 
 DTOs separate API request/response models from persistence entities. Centralized exception handling provides a consistent approach to API errors.
 
