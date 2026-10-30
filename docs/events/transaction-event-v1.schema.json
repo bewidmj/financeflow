@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FinanceFlow Transaction Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "transactionId",
+    "transactionVersion",
+    "userId",
+    "before",
+    "after",
+    "occurredAt",
+    "correlationId"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": {
+      "type": "string",
+      "enum": ["TransactionCreated", "TransactionUpdated", "TransactionDeleted"]
+    },
+    "eventVersion": { "const": 1 },
+    "transactionId": { "type": "integer", "minimum": 1 },
+    "transactionVersion": { "type": "integer", "minimum": 1 },
+    "userId": { "type": "string", "format": "uuid" },
+    "before": {
+      "anyOf": [{ "$ref": "#/$defs/snapshot" }, { "type": "null" }]
+    },
+    "after": {
+      "anyOf": [{ "$ref": "#/$defs/snapshot" }, { "type": "null" }]
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "eventType": { "const": "TransactionCreated" },
+        "transactionVersion": { "const": 1 },
+        "before": { "type": "null" },
+        "after": { "$ref": "#/$defs/snapshot" }
+      }
+    },
+    {
+      "properties": {
+        "eventType": { "const": "TransactionUpdated" },
+        "transactionVersion": { "minimum": 2 },
+        "before": { "$ref": "#/$defs/snapshot" },
+        "after": { "$ref": "#/$defs/snapshot" }
+      }
+    },
+    {
+      "properties": {
+        "eventType": { "const": "TransactionDeleted" },
+        "transactionVersion": { "minimum": 2 },
+        "before": { "$ref": "#/$defs/snapshot" },
+        "after": { "type": "null" }
+      }
+    }
+  ],
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accountId",
+        "transactionType",
+        "amount",
+        "currency",
+        "category",
+        "description",
+        "transactionDate"
+      ],
+      "properties": {
+        "accountId": { "type": ["string", "null"], "format": "uuid" },
+        "transactionType": { "type": "string", "enum": ["INCOME", "EXPENSE"] },
+        "amount": { "type": "number", "exclusiveMinimum": 0, "multipleOf": 0.01 },
+        "currency": { "const": "INR" },
+        "category": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": ["string", "null"], "maxLength": 500 },
+        "transactionDate": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

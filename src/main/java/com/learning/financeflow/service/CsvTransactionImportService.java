@@ -9,6 +9,8 @@ import jakarta.validation.Validator;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,12 +18,17 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -30,12 +37,14 @@ import java.util.UUID;
 @Service
 public class CsvTransactionImportService {
 
+    private static final Logger logger = LoggerFactory.getLogger(CsvTransactionImportService.class);
     private static final Set<String> REQUIRED_HEADERS = Set.of(
             "amount",
             "type",
             "category",
             "description",
-            "transactionDate"
+            "transactionDate",
+            "accountId"
     );
 
     private static final int BATCH_SIZE = 50;
@@ -69,16 +78,18 @@ public class CsvTransactionImportService {
 
         int imported = 0;
         int failed = 0;
+        int skipped = 0;
         List<String> errors = new ArrayList<>();
         List<ImportRow> validRows = new ArrayList<>();
+        MessageDigest digest = sha256Digest();
 
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader()
                 .setSkipHeaderRecord(true)
                 .get();
 
-        try (Reader reader = new InputStreamReader(
-                    file.getInputStream(), StandardCharsets.UTF_8);
+        try (InputStream input = new DigestInputStream(file.getInputStream(), digest);
+            Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8);
             CSVParser parser = CSVParser.parse(reader, format)) {
 
             if (!parser.getHeaderMap().keySet()
@@ -131,6 +142,8 @@ public class CsvTransactionImportService {
             );
         }
 
+        String fileHash = HexFormat.of().formatHex(digest.digest());
+
         // Phase 2: Save valid rows in independent transactions of 50.
         for (int start = 0; start < validRows.size();
                 start += BATCH_SIZE) {
@@ -138,15 +151,20 @@ public class CsvTransactionImportService {
             int end = Math.min(start + BATCH_SIZE, validRows.size());
             List<ImportRow> batch = validRows.subList(start, end);
 
-            List<CreateTransactionRequest> requests = batch.stream()
-                    .map(ImportRow::request)
+            List<CsvTransactionRow> rows = batch.stream()
+                    .map(row -> new CsvTransactionRow(row.rowNumber(), row.request()))
                     .toList();
 
             try {
-                transactionService.createBulk(requests, ownerId);
-                imported += batch.size();
+                int created = transactionService.createImportedBulk(rows, ownerId, fileHash);
+                imported += created;
+                skipped += batch.size() - created;
 
             } catch (DataAccessException ex) {
+                logger.error("CSV transaction batch failed for rows {}-{}",
+                        batch.getFirst().rowNumber(),
+                        batch.getLast().rowNumber(),
+                        ex);
                 failed += batch.size();
 
                 for (ImportRow row : batch) {
@@ -160,9 +178,16 @@ public class CsvTransactionImportService {
                 (System.nanoTime() - startTime) / 1_000_000;
 
         return new CsvImportResponse(
-                imported, failed, errors, processingTimeMs);
+                imported, failed, skipped, errors, processingTimeMs);
     }
 
+    private MessageDigest sha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
 
     private CreateTransactionRequest toRequest(CSVRecord record) {
 
@@ -178,13 +203,15 @@ public class CsvTransactionImportService {
 
         LocalDate transactionDate =
                 LocalDate.parse(record.get("transactionDate").trim());
+        UUID accountId = UUID.fromString(record.get("accountId").trim());
 
         return new CreateTransactionRequest(
                 amount,
                 type,
                 category,
                 description,
-                transactionDate
+                transactionDate,
+                accountId
         );
     }
 }

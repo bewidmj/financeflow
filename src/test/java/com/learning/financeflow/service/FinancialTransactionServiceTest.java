@@ -6,6 +6,9 @@ import com.learning.financeflow.dto.TransactionResponse;
 import com.learning.financeflow.entity.FinancialTransaction;
 import com.learning.financeflow.entity.TransactionType;
 import com.learning.financeflow.repository.FinancialTransactionRepository;
+import com.learning.financeflow.repository.CsvImportRowStore;
+import com.learning.financeflow.outbox.OutboxEventFactory;
+import com.learning.financeflow.outbox.OutboxEventRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,15 @@ class FinancialTransactionServiceTest {
 
     @Mock
     private FinancialTransactionRepository repository;
+
+    @Mock
+    private OutboxEventRepository outboxRepository;
+
+    @Mock
+    private OutboxEventFactory outboxEventFactory;
+
+    @Mock
+    private CsvImportRowStore csvImportRowStore;
 
     @InjectMocks
     private FinancialTransactionService service;
@@ -73,12 +85,15 @@ class FinancialTransactionServiceTest {
         assertEquals(request.description(), saved.getDescription());
         assertEquals(request.transactionDate(), saved.getTransactionDate());
         assertEquals(OWNER_ID, saved.getOwnerId());
+        assertNull(saved.getAccountId());
 
         assertEquals(request.amount(), response.amount());
         assertEquals(request.type(), response.type());
         assertEquals(request.category(), response.category());
         assertEquals(request.description(), response.description());
         assertEquals(request.transactionDate(), response.transactionDate());
+        assertEquals(1, response.transactionVersion());
+        verify(outboxRepository).save(any());
     }
 
     @Test

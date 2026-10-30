@@ -6,6 +6,10 @@ import com.learning.financeflow.dto.TransactionResponse;
 import com.learning.financeflow.entity.FinancialTransaction;
 import com.learning.financeflow.entity.TransactionType;
 import com.learning.financeflow.repository.FinancialTransactionRepository;
+import com.learning.financeflow.event.TransactionSnapshot;
+import com.learning.financeflow.outbox.OutboxEventFactory;
+import com.learning.financeflow.outbox.OutboxEventRepository;
+import com.learning.financeflow.repository.CsvImportRowStore;
 import com.learning.financeflow.specification.TransactionSpecifications;
 
 import org.springframework.stereotype.Service;
@@ -24,10 +28,19 @@ import java.util.UUID;
 public class FinancialTransactionService {
 
     private final FinancialTransactionRepository repository;
+    private final OutboxEventRepository outboxRepository;
+    private final OutboxEventFactory outboxEventFactory;
+    private final CsvImportRowStore csvImportRowStore;
 
     public FinancialTransactionService(
-            FinancialTransactionRepository repository) {
+            FinancialTransactionRepository repository,
+            OutboxEventRepository outboxRepository,
+            OutboxEventFactory outboxEventFactory,
+            CsvImportRowStore csvImportRowStore) {
         this.repository = repository;
+        this.outboxRepository = outboxRepository;
+        this.outboxEventFactory = outboxEventFactory;
+        this.csvImportRowStore = csvImportRowStore;
     }
 
     @Transactional
@@ -42,9 +55,11 @@ public class FinancialTransactionService {
                         request.type(),
                         request.category(),
                         request.description(),
-                        request.transactionDate());
+                        request.transactionDate(),
+                        request.accountId());
 
         FinancialTransaction saved = repository.save(transaction);
+        outboxRepository.save(outboxEventFactory.created(saved));
 
         return toResponse(saved);
     }
@@ -57,7 +72,9 @@ public class FinancialTransactionService {
                 transaction.getType(),
                 transaction.getCategory(),
                 transaction.getDescription(),
-                transaction.getTransactionDate());
+                transaction.getTransactionDate(),
+                transaction.getAccountId(),
+                transaction.getTransactionVersion());
     }
 
     @Transactional(readOnly = true)
@@ -80,12 +97,15 @@ public class FinancialTransactionService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Transaction not found with id: " + id));
+        TransactionSnapshot before = TransactionSnapshot.from(transaction);
         transaction.update(
                 request.amount(),
                 request.type(),
                 request.category(),
                 request.description(),
-                request.transactionDate());
+                request.transactionDate(),
+                request.accountId());
+        outboxRepository.save(outboxEventFactory.updated(transaction, before));
         return toResponse(transaction);
     }
 
@@ -95,6 +115,8 @@ public class FinancialTransactionService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Transaction not found with id: " + id));
+        outboxRepository.save(outboxEventFactory.deleted(
+                transaction, TransactionSnapshot.from(transaction)));
         repository.delete(transaction);
     }
 
@@ -149,12 +171,16 @@ public class FinancialTransactionService {
                         request.type(),
                         request.category(),
                         request.description(),
-                        request.transactionDate()
+                        request.transactionDate(),
+                        request.accountId()
                 ))
                 .toList();
 
         List<FinancialTransaction> savedTransactions =
                 repository.saveAll(transactions);
+        outboxRepository.saveAll(savedTransactions.stream()
+                .map(outboxEventFactory::created)
+                .toList());
 
         List<TransactionResponse> responses = savedTransactions.stream()
                 .map(this::toResponse)
@@ -166,5 +192,41 @@ public class FinancialTransactionService {
         );
     }
 
+    @Transactional
+    public int createImportedBulk(
+            List<CsvTransactionRow> rows, UUID ownerId, String fileHash) {
+        List<FinancialTransaction> transactions = new java.util.ArrayList<>();
+        List<CsvTransactionRow> reservedRows = new java.util.ArrayList<>();
+        for (CsvTransactionRow row : rows) {
+            if (!csvImportRowStore.reserve(ownerId, fileHash, row.rowNumber())) {
+                continue;
+            }
+            CreateTransactionRequest request = row.request();
+            transactions.add(new FinancialTransaction(
+                    ownerId,
+                    request.amount(),
+                    request.type(),
+                    request.category(),
+                    request.description(),
+                    request.transactionDate(),
+                    request.accountId()));
+            reservedRows.add(row);
+        }
+        if (transactions.isEmpty()) {
+            return 0;
+        }
+        List<FinancialTransaction> saved = repository.saveAll(transactions);
+        outboxRepository.saveAll(saved.stream()
+                .map(outboxEventFactory::created)
+                .toList());
+        for (int index = 0; index < saved.size(); index++) {
+            csvImportRowStore.complete(
+                    ownerId,
+                    fileHash,
+                    reservedRows.get(index).rowNumber(),
+                    saved.get(index).getId());
+        }
+        return saved.size();
+    }
 
 }

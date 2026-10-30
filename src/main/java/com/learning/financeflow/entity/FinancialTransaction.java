@@ -27,6 +27,16 @@ public class FinancialTransaction {
     @Column(name = "owner_id")
     private UUID ownerId;
 
+    @Column(name = "account_id")
+    private UUID accountId;
+
+    @Column(name = "transaction_version", nullable = false)
+    private long transactionVersion = 1;
+
+    @Version
+    @Column(name = "persistence_version", nullable = false)
+    private long persistenceVersion;
+
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
@@ -53,13 +63,25 @@ public class FinancialTransaction {
             TransactionType type,
             String category,
             String description,
-            LocalDate transactionDate) {
+            LocalDate transactionDate,
+            UUID accountId) {
         this.ownerId = ownerId;
+        this.accountId = accountId;
         this.amount = amount;
         this.type = type;
         this.category = category;
         this.description = description;
         this.transactionDate = transactionDate;
+    }
+
+    public FinancialTransaction(
+            UUID ownerId,
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate) {
+        this(ownerId, amount, type, category, description, transactionDate, null);
     }
 
     public Long getId() {
@@ -68,6 +90,14 @@ public class FinancialTransaction {
 
     public UUID getOwnerId() {
         return ownerId;
+    }
+
+    public UUID getAccountId() {
+        return accountId;
+    }
+
+    public long getTransactionVersion() {
+        return transactionVersion;
     }
 
     public BigDecimal getAmount() {
@@ -95,11 +125,16 @@ public class FinancialTransaction {
             TransactionType type,
             String category,
             String description,
-            LocalDate transactionDate) {
+            LocalDate transactionDate,
+            UUID accountId) {
         this.amount = amount;
         this.type = type;
         this.category = category;
         this.description = description;
         this.transactionDate = transactionDate;
+        if (accountId != null) {
+            this.accountId = accountId;
+        }
+        transactionVersion++;
     }
 }

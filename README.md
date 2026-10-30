@@ -8,6 +8,7 @@ The project is being developed as a hands-on learning journey covering REST API 
 
 ### Financial Transactions
 - Create and retrieve financial transactions.
+- Optionally associate transactions with an owned account and publish versioned account-impact events.
 - Represent income and expenses using structured DTOs.
 - Persist transaction data using Spring Data JPA and PostgreSQL.
 - Filter transactions using supported search criteria.
@@ -15,6 +16,7 @@ The project is being developed as a hands-on learning journey covering REST API 
 
 ### CSV Import
 - Import financial transactions from CSV files.
+- Include an `accountId` column; rows are idempotent on a per-user, file-content, and row-number basis.
 - Report successful imports and failed records.
 - Process large CSV files and investigate persistence performance.
 - Explore Hibernate JDBC batching and database ID-generation strategies.
@@ -60,11 +62,15 @@ REST Controllers
   v
 Services
   |
-  v
-Repositories (Spring Data JPA)
+  +--> PostgreSQL transaction (transaction + outbox)
   |
-  v
-PostgreSQL
+  +--> Kafka outbox publisher --> financeflow.transactions.v1
+                                      |
+                                      v
+                            Account Service consumer
+                                      |
+                                      v
+                      Account DB (inbox + immutable ledger)
 ```
 
 DTOs separate API request/response models from persistence entities. Centralized exception handling provides a consistent approach to API errors.
@@ -124,6 +130,53 @@ export JWT_JWKS_URI="http://localhost:8081/.well-known/jwks.json"
 The URI is trusted application configuration, not read from the incoming token. FinanceFlow pins verification to RS256, validates standard token time claims, and selects the public key using the token `kid`. It uses a 2-second connect timeout, 5-second read timeout, and Nimbus's default JWKS cache/refresh behavior (approximately five minutes). A running instance can use a cached key during a temporary JWKS outage until a refresh is needed; a cold instance without a cached key cannot validate tokens until the Identity Service becomes reachable. Keep network access and readiness expectations aligned with this behavior.
 
 Swagger/OpenAPI remains public; API endpoints require a valid bearer token. FinanceFlow ownership is derived from the verified token's `sub` UUID, and normal transaction and budget records continue to be scoped to that identity. Admin transaction browsing is additionally restricted to a verified `role: ADMIN` JWT claim and is exposed only through `/api/v1/admin/**`.
+
+### Account event integration
+
+FinanceFlow persists transaction changes and event payloads in the same PostgreSQL transaction. A scheduled publisher claims outbox rows with leases and `SKIP LOCKED`, publishes with the transaction ID as Kafka key, and marks them published only after broker acknowledgment. Kafka delivery is at-least-once; Account Service deduplicates event IDs in its own inbox and enforces transaction versions before applying ledger changes.
+
+The topic is `financeflow.transactions.v1`; the consumer dead-letter topic is `financeflow.transactions.v1.dlt`. The event envelope and JSON schema are documented in [docs/events/transaction-event-v1.schema.json](./docs/events/transaction-event-v1.schema.json). `eventVersion` versions the contract; `transactionVersion` orders each transaction's lifecycle. Updates carry `before` and `after` snapshots; deletes carry the prior snapshot, allowing append-only reversals. Existing transactions remain unlinked, and records with a null account ID have no account-balance effect until a later linked update. New UI transaction forms require an active INR account. API account IDs remain optional for compatibility, so legacy clients can still create unlinked records.
+
+Finance transaction amounts are currently INR-only. The Account consumer rejects events for non-INR accounts or accounts not owned by the event user. The account ID is never used as proof of ownership; Account Service validates the JWT-derived user ID from the event against its own account record.
+
+Apply the Finance schema change to an existing PostgreSQL database before deploying this version:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f src/main/resources/db/manual/V2__transaction_account_outbox.sql
+```
+
+FinanceFlow currently uses Hibernate `ddl-auto=update`; the checked-in SQL is the repeatable production migration. Account Service applies its `V2__transaction_event_inbox_and_ledger_sources.sql` through Flyway on startup.
+
+### Local Kafka
+
+Start the local single-node KRaft broker from the Finance repository:
+
+```bash
+docker compose -f docker-compose.kafka.yml up -d
+```
+
+The broker listens on `localhost:9092`. Start FinanceFlow and Account Service with `KAFKA_BOOTSTRAP_SERVERS=localhost:9092`. Account Service creates the two transaction topics when connected. Stop the broker with `docker compose -f docker-compose.kafka.yml down`; add `-v` only when intentionally deleting local Kafka data.
+
+Monitor pending or exhausted Finance outbox events with:
+
+```sql
+SELECT id, aggregate_id, event_type, status, attempt_count, last_error, created_at
+FROM finance_transaction_outbox
+WHERE status IN ('RETRY', 'FAILED', 'IN_FLIGHT')
+ORDER BY created_at;
+```
+
+After resolving a broker or configuration problem, an operator can replay one exhausted event without changing its ID or payload:
+
+```sql
+UPDATE finance_transaction_outbox
+SET status = 'PENDING', attempt_count = 0, next_attempt_at = CURRENT_TIMESTAMP,
+    claimed_until = NULL, claim_token = NULL, last_error = NULL
+WHERE id = '<event-uuid>' AND status = 'FAILED';
+```
+
+The Account consumer retries transient failures with exponential backoff and publishes exhausted records to the DLT. Version gaps and permanent ownership/account/currency failures are not silently applied. Inspect the DLT and application logs, repair the underlying issue, then replay messages in transaction-version order; inbox event IDs make already-processed messages safe to replay. Actuator metrics include Finance outbox publication and Account event processing/duplicate/failure counters.
 
 Transactions are associated with the authenticated JWT subject. When ownership is first added, existing database rows are retained with no owner and are excluded from user queries. They are not automatically assigned to an account. Before making the owner column mandatory, backfill only from a verified transaction-to-user mapping (or explicitly archive/remove legacy rows), then apply a versioned migration and the non-null constraint.
 

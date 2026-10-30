@@ -13,6 +13,9 @@ import com.learning.financeflow.entity.FinancialTransaction;
 import com.learning.financeflow.entity.TransactionType;
 import com.learning.financeflow.repository.BudgetRepository;
 import com.learning.financeflow.repository.FinancialTransactionRepository;
+import com.learning.financeflow.outbox.OutboxEventRepository;
+import com.learning.financeflow.service.FinancialTransactionService;
+import com.learning.financeflow.dto.CreateTransactionRequest;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -50,8 +53,15 @@ class TransactionOwnershipIntegrationTest {
     @Autowired
     private BudgetRepository budgetRepository;
 
+    @Autowired
+    private OutboxEventRepository outboxRepository;
+
+    @Autowired
+    private FinancialTransactionService transactionService;
+
     @BeforeEach
     void clearTransactions() {
+        outboxRepository.deleteAll();
         budgetRepository.deleteAll();
         transactionRepository.deleteAll();
     }
@@ -80,6 +90,7 @@ class TransactionOwnershipIntegrationTest {
                         .header("Authorization", bearer(USER_ONE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(transactionId));
+        org.junit.jupiter.api.Assertions.assertEquals(1, outboxRepository.count());
 
         mockMvc.perform(get("/api/v1/transactions/{id}", transactionId)
                         .header("Authorization", bearer(USER_TWO)))
@@ -239,8 +250,8 @@ class TransactionOwnershipIntegrationTest {
     void csvImportAssignsEveryTransactionToTheAuthenticatedUser()
             throws Exception {
         byte[] csv = """
-                amount,type,category,description,transactionDate
-                12.50,EXPENSE,CSV_USER_ONE,Imported,2026-10-12
+                amount,type,category,description,transactionDate,accountId
+                12.50,EXPENSE,CSV_USER_ONE,Imported,2026-10-12,9a367ac2-ae09-4da9-9b30-7cb9ee1439be
                 """.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         mockMvc.perform(multipart("/api/v1/transactions/import")
@@ -249,6 +260,13 @@ class TransactionOwnershipIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.imported").value(1))
                 .andExpect(jsonPath("$.failed").value(0));
+        mockMvc.perform(multipart("/api/v1/transactions/import")
+                        .file("file", csv)
+                        .header("Authorization", bearer(USER_ONE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported").value(0))
+                .andExpect(jsonPath("$.skipped").value(1));
+        org.junit.jupiter.api.Assertions.assertEquals(1, outboxRepository.count());
 
         mockMvc.perform(get("/api/v1/transactions")
                         .header("Authorization", bearer(USER_TWO)))
@@ -261,6 +279,23 @@ class TransactionOwnershipIntegrationTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].category")
                         .value("CSV_USER_ONE"));
+    }
+
+    @Test
+    void failedTransactionPersistenceDoesNotLeaveAnOutboxEvent() {
+        org.junit.jupiter.api.Assertions.assertThrows(
+                RuntimeException.class,
+                () -> transactionService.create(
+                        new CreateTransactionRequest(
+                                null,
+                                TransactionType.EXPENSE,
+                                "INVALID",
+                                "Must roll back",
+                                LocalDate.of(2026, 10, 12)),
+                        USER_ONE));
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, transactionRepository.count());
+        org.junit.jupiter.api.Assertions.assertEquals(0, outboxRepository.count());
     }
 
     @Test

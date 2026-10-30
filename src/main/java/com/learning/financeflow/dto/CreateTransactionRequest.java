@@ -4,6 +4,7 @@ import com.learning.financeflow.entity.TransactionType;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 public record CreateTransactionRequest(
 
@@ -24,6 +25,17 @@ public record CreateTransactionRequest(
 
         @NotNull
         @PastOrPresent
-        LocalDate transactionDate
+        LocalDate transactionDate,
 
-) {}
+        UUID accountId
+
+) {
+    public CreateTransactionRequest(
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate) {
+        this(amount, type, category, description, transactionDate, null);
+    }
+}
