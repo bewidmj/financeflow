@@ -59,7 +59,7 @@
     <text x="394" y="240" class="card-subtitle">React · TypeScript · Vite</text>
     <line x1="394" y1="255" x2="686" y2="255" stroke="#e2e8f0"/>
     <text x="394" y="280" class="body">Transactions · budgets · accounts</text>
-    <text x="394" y="304" class="small">Local Vite proxy routes /identity, /finance, /accounts</text>
+    <text x="394" y="304" class="small">Local Vite proxy: /identity, /finance, /account-api</text>
   </g>
 
   <path d="M290 260 H370" fill="none" stroke="#475569" stroke-width="2.5" marker-end="url(#arrow)"/>
