@@ -75,6 +75,7 @@
       ],
       "properties": {
         "accountId": { "type": ["string", "null"], "format": "uuid" },
+        "creditCardId": { "type": ["string", "null"], "format": "uuid" },
         "transactionType": { "type": "string", "enum": ["INCOME", "EXPENSE"] },
         "amount": { "type": "number", "exclusiveMinimum": 0, "multipleOf": 0.01 },
         "currency": { "const": "INR" },

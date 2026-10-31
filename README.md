@@ -53,7 +53,7 @@ The project is being developed as a hands-on learning journey covering REST API 
 
 ![FinanceFlow system architecture](./docs/architecture/financeflow-architecture.svg)
 
-The editable [draw.io source](./docs/architecture/financeflow-architecture.drawio) shows the service boundaries, JWT/JWKS trust, transaction outbox and Kafka event flow, and the separate databases owned by each service.
+The editable [draw.io source](./docs/architecture/financeflow-architecture.drawio) shows the service boundaries, JWT/JWKS trust, transaction outbox and Kafka event flow, and the Account-owned repayment saga. Finance, Account, and Credit Card Services each own a separate PostgreSQL database; the services exchange events through Kafka rather than sharing tables.
 
 DTOs separate API request/response models from persistence entities. Centralized exception handling provides a consistent approach to API errors.
 
@@ -121,14 +121,19 @@ The topic is `financeflow.transactions.v1`; the consumer dead-letter topic is `f
 
 Finance transaction amounts are currently INR-only. The Account consumer rejects events for non-INR accounts or accounts not owned by the event user. The account ID is never used as proof of ownership; Account Service validates the JWT-derived user ID from the event against its own account record.
 
-Apply the Finance schema change to an existing PostgreSQL database before deploying this version:
+Apply the Finance schema changes to an existing PostgreSQL database before deploying this version:
 
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f src/main/resources/db/manual/V2__transaction_account_outbox.sql
 ```
 
-FinanceFlow currently uses Hibernate `ddl-auto=update`; the checked-in SQL is the repeatable production migration. Account Service applies its `V2__transaction_event_inbox_and_ledger_sources.sql` through Flyway on startup.
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f src/main/resources/db/manual/V3__transaction_credit_card_source.sql
+```
+
+`creditCardId` is an optional transaction payment source and is mutually exclusive with `accountId`. It does not create another expense record. FinanceFlow currently uses Hibernate `ddl-auto=update`; the checked-in SQL is the repeatable production migration. Account Service applies its `V2__transaction_event_inbox_and_ledger_sources.sql` through Flyway on startup.
 
 ### Local Kafka
 

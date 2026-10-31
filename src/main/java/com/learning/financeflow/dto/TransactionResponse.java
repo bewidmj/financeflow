@@ -13,6 +13,7 @@ public record TransactionResponse(
         String description,
         LocalDate transactionDate,
         UUID accountId,
+        UUID creditCardId,
         long transactionVersion
 ) {
     public TransactionResponse(
@@ -21,7 +22,28 @@ public record TransactionResponse(
             TransactionType type,
             String category,
             String description,
+            LocalDate transactionDate,
+            UUID accountId,
+            long transactionVersion) {
+        this(
+                id,
+                amount,
+                type,
+                category,
+                description,
+                transactionDate,
+                accountId,
+                null,
+                transactionVersion);
+    }
+
+    public TransactionResponse(
+            Long id,
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
             LocalDate transactionDate) {
-        this(id, amount, type, category, description, transactionDate, null, 1);
+        this(id, amount, type, category, description, transactionDate, null, null, 1);
     }
 }

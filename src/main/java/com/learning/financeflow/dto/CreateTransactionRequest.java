@@ -27,15 +27,32 @@ public record CreateTransactionRequest(
         @PastOrPresent
         LocalDate transactionDate,
 
-        UUID accountId
+        UUID accountId,
+
+        UUID creditCardId
 
 ) {
+    @AssertTrue(message = "A transaction cannot reference both an account and a credit card")
+    public boolean hasAtMostOnePaymentSource() {
+        return accountId == null || creditCardId == null;
+    }
+
     public CreateTransactionRequest(
             BigDecimal amount,
             TransactionType type,
             String category,
             String description,
             LocalDate transactionDate) {
-        this(amount, type, category, description, transactionDate, null);
+        this(amount, type, category, description, transactionDate, null, null);
+    }
+
+    public CreateTransactionRequest(
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate,
+            UUID accountId) {
+        this(amount, type, category, description, transactionDate, accountId, null);
     }
 }

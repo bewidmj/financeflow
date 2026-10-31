@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record TransactionSnapshot(
         UUID accountId,
+        UUID creditCardId,
         TransactionType transactionType,
         BigDecimal amount,
         String currency,
@@ -18,6 +19,7 @@ public record TransactionSnapshot(
     public static TransactionSnapshot from(FinancialTransaction transaction) {
         return new TransactionSnapshot(
                 transaction.getAccountId(),
+                transaction.getCreditCardId(),
                 transaction.getType(),
                 transaction.getAmount(),
                 "INR",

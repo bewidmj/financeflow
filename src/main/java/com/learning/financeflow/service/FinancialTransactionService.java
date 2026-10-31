@@ -56,7 +56,8 @@ public class FinancialTransactionService {
                         request.category(),
                         request.description(),
                         request.transactionDate(),
-                        request.accountId());
+                        request.accountId(),
+                        request.creditCardId());
 
         FinancialTransaction saved = repository.save(transaction);
         outboxRepository.save(outboxEventFactory.created(saved));
@@ -74,6 +75,7 @@ public class FinancialTransactionService {
                 transaction.getDescription(),
                 transaction.getTransactionDate(),
                 transaction.getAccountId(),
+                transaction.getCreditCardId(),
                 transaction.getTransactionVersion());
     }
 
@@ -104,7 +106,8 @@ public class FinancialTransactionService {
                 request.category(),
                 request.description(),
                 request.transactionDate(),
-                request.accountId());
+                request.accountId(),
+                request.creditCardId());
         outboxRepository.save(outboxEventFactory.updated(transaction, before));
         return toResponse(transaction);
     }
@@ -172,7 +175,8 @@ public class FinancialTransactionService {
                         request.category(),
                         request.description(),
                         request.transactionDate(),
-                        request.accountId()
+                        request.accountId(),
+                        request.creditCardId()
                 ))
                 .toList();
 
@@ -209,7 +213,8 @@ public class FinancialTransactionService {
                     request.category(),
                     request.description(),
                     request.transactionDate(),
-                    request.accountId()));
+                    request.accountId(),
+                    request.creditCardId()));
             reservedRows.add(row);
         }
         if (transactions.isEmpty()) {

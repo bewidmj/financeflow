@@ -30,6 +30,9 @@ public class FinancialTransaction {
     @Column(name = "account_id")
     private UUID accountId;
 
+    @Column(name = "credit_card_id")
+    private UUID creditCardId;
+
     @Column(name = "transaction_version", nullable = false)
     private long transactionVersion = 1;
 
@@ -64,9 +67,11 @@ public class FinancialTransaction {
             String category,
             String description,
             LocalDate transactionDate,
-            UUID accountId) {
+            UUID accountId,
+            UUID creditCardId) {
         this.ownerId = ownerId;
         this.accountId = accountId;
+        this.creditCardId = creditCardId;
         this.amount = amount;
         this.type = type;
         this.category = category;
@@ -84,6 +89,17 @@ public class FinancialTransaction {
         this(ownerId, amount, type, category, description, transactionDate, null);
     }
 
+    public FinancialTransaction(
+            UUID ownerId,
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate,
+            UUID accountId) {
+        this(ownerId, amount, type, category, description, transactionDate, accountId, null);
+    }
+
     public Long getId() {
         return id;
     }
@@ -94,6 +110,10 @@ public class FinancialTransaction {
 
     public UUID getAccountId() {
         return accountId;
+    }
+
+    public UUID getCreditCardId() {
+        return creditCardId;
     }
 
     public long getTransactionVersion() {
@@ -126,15 +146,27 @@ public class FinancialTransaction {
             String category,
             String description,
             LocalDate transactionDate,
-            UUID accountId) {
+            UUID accountId,
+            UUID creditCardId) {
         this.amount = amount;
         this.type = type;
         this.category = category;
         this.description = description;
         this.transactionDate = transactionDate;
-        if (accountId != null) {
+        if (accountId != null || creditCardId != null) {
             this.accountId = accountId;
+            this.creditCardId = creditCardId;
         }
         transactionVersion++;
+    }
+
+    public void update(
+            BigDecimal amount,
+            TransactionType type,
+            String category,
+            String description,
+            LocalDate transactionDate,
+            UUID accountId) {
+        update(amount, type, category, description, transactionDate, accountId, null);
     }
 }
